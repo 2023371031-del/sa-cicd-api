@@ -1,0 +1,613 @@
+% =====================================================================
+%  Reporte - Proyecto Integrador: Pipeline CI/CD (Flask, Docker,
+%  GitHub Actions y AWS EC2)
+%  Compilar con XeLaTeX / LuaLaTeX / Tectonic (o en Overleaf con XeLaTeX)
+% =====================================================================
+\documentclass[12pt,letterpaper]{article}
+
+% ---------------- DATOS DE LA PORTADA (editar aquí) ----------------
+\newcommand{\institucion}{UNIVERSIDAD TECNOLÓGICA}             % <-- nombre completo de tu universidad
+\newcommand{\carrera}{Ingeniería en Desarrollo y Gestión de Software}
+\newcommand{\materia}{DevOps}                                  % <-- nombre oficial de la materia
+\newcommand{\profesor}{Emmanuel Martínez Hernández}
+\newcommand{\grupo}{IDGS16}
+\newcommand{\integrantes}{Diego Garcia Martínez\\ % <-- agregar al resto del equipo
+}
+\newcommand{\fecha}{5 de octubre de 2026}
+% Logo: colocar el archivo en figuras/logo.png
+% -------------------------------------------------------------------
+
+\usepackage[spanish,es-tabla,es-nodecimaldot]{babel}
+\usepackage{fontspec}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage[font=small,labelfont=bf]{caption}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{setspace}
+\usepackage{indentfirst}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,shapes.geometric,fit,backgrounds}
+\usepackage[hidelinks]{hyperref}
+\usepackage{url}
+
+\onehalfspacing
+\setlength{\parskip}{0.4em}
+\graphicspath{{figuras/}}
+\setlength{\emergencystretch}{3em}
+
+\definecolor{codebg}{RGB}{246,246,246}
+\definecolor{terminal}{RGB}{30,30,30}
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  backgroundcolor=\color{codebg},
+  frame=single, rulecolor=\color{gray!50},
+  breaklines=true, columns=fullflexible, keepspaces=true,
+  showstringspaces=false, upquote=true,
+  literate={á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1 {ñ}{{\~n}}1
+           {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ú}{{\'U}}1 {→}{{$\to$}}1
+}
+\lstdefinestyle{term}{
+  backgroundcolor=\color{terminal}, basicstyle=\ttfamily\scriptsize\color{white},
+  rulecolor=\color{terminal}
+}
+
+% Captura de pantalla: si el archivo existe se inserta; si no, se dibuja un
+% recuadro indicando qué captura falta.  \captura{archivo}{pie de figura}{etiqueta}
+\newcommand{\captura}[3]{%
+  \begin{figure}[H]
+    \centering
+    \IfFileExists{figuras/#1}{%
+      \includegraphics[width=0.92\textwidth,height=0.42\textheight,keepaspectratio]{#1}%
+    }{%
+      \fbox{\parbox[c][4.5cm][c]{0.85\textwidth}{\centering\color{red!70!black}
+        \textbf{INSERTAR CAPTURA}\\[0.4em]\texttt{\detokenize{figuras/#1}}\\[0.4em]\small #2}}%
+    }
+    \caption{#2}
+    \label{#3}
+  \end{figure}}
+
+\begin{document}
+
+% =====================================================================
+%  PORTADA
+% =====================================================================
+\begin{titlepage}
+  \centering
+  \IfFileExists{figuras/logo.png}{\includegraphics[height=3.2cm]{logo.png}\par\vspace{0.8cm}}{}
+  {\Large\bfseries \institucion\par}
+  \vspace{0.3cm}
+  {\large \carrera\par}
+  \vspace{2.2cm}
+  {\large Materia: \materia\par}
+  \vspace{1.2cm}
+  \rule{\textwidth}{1pt}\par\vspace{0.4cm}
+  {\LARGE\bfseries Proyecto Integrador:\par}
+  \vspace{0.3cm}
+  {\Large\bfseries Pipeline CI/CD automatizado para una API REST con Docker, GitHub Actions y AWS EC2\par}
+  \vspace{0.4cm}\rule{\textwidth}{1pt}\par
+  \vspace{2cm}
+  {\large \textbf{Integrantes:}\par}
+  \vspace{0.2cm}
+  {\large \integrantes\par}
+  \vspace{1cm}
+  {\large \textbf{Grupo:} \grupo\par}
+  \vspace{0.3cm}
+  {\large \textbf{Profesor:} \profesor\par}
+  \vfill
+  {\large \fecha\par}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+\listoffigures
+\newpage
+
+% =====================================================================
+\section{Introducción}
+% =====================================================================
+
+El desarrollo de software moderno ya no termina cuando el programador escribe la última línea de
+código. Para que una aplicación genere valor tiene que llegar a producción de forma rápida,
+repetible y segura, y tiene que poder actualizarse muchas veces sin que los usuarios lo noten.
+Durante años el paso del código al servidor se hacía de forma manual: alguien compilaba el
+proyecto en su computadora, copiaba archivos al servidor, reiniciaba servicios y cruzaba los dedos.
+Este proceso era lento, dependía de la memoria de una persona y era una fuente constante de
+errores del tipo ``en mi máquina sí funciona''. La cultura DevOps surge precisamente para cerrar
+la brecha entre quienes desarrollan y quienes operan el software, apoyándose en la automatización
+de todo el ciclo de vida de una aplicación \cite{kim2016}.
+
+Dos prácticas son el corazón de esa automatización. La \textbf{integración continua} (CI,
+\textit{Continuous Integration}) consiste en que cada cambio que se sube al repositorio se
+compila y se prueba automáticamente, de modo que los errores se detectan minutos después de
+haberse introducido y no semanas después \cite{fowler2006}. La \textbf{entrega y despliegue
+continuo} (CD, \textit{Continuous Delivery/Deployment}) extiende esa idea: si las pruebas pasan,
+el mismo proceso empaqueta la aplicación y la publica en el servidor sin intervención humana
+\cite{humble2010}. Al conjunto ordenado de pasos que sigue el código desde el \texttt{git push}
+hasta producción se le llama \textit{pipeline}.
+
+Para que el pipeline sea confiable, el artefacto que se prueba debe ser exactamente el mismo que
+se ejecuta en producción. Aquí entran los \textbf{contenedores}: Docker permite empaquetar la
+aplicación junto con su intérprete y sus dependencias en una imagen inmutable que se comporta igual
+en la laptop del desarrollador, en el servidor de integración y en la nube \cite{dockerdocs}.
+Estas imágenes se guardan en un registro (en este proyecto, Docker Hub) y se identifican con
+etiquetas; usar el hash del commit como etiqueta permite saber con precisión qué versión del código
+está corriendo y regresar a una versión anterior si algo falla.
+
+En este proyecto integrador se implementó un flujo de trabajo completo y profesional para el ciclo
+de vida de una API REST. Se desarrolló una API en Python con el microframework Flask
+\cite{flaskdocs} que expone 75 endpoints sobre diez recursos de un sistema de ventas (usuarios,
+categorías, proveedores, productos, clientes, pedidos, departamentos, empleados, reseñas y
+cupones). La API cuenta con 181 pruebas automatizadas escritas con pytest, que alcanzan una
+cobertura de código del 99\,\%, muy por encima del umbral mínimo exigido del 70\,\%. El pipeline,
+definido con GitHub Actions \cite{githubactions}, ejecuta el análisis estático y las pruebas en cada
+\textit{push} o \textit{pull request} a la rama \texttt{main}; cuando el cambio llega a
+\texttt{main}, construye la imagen Docker, la publica en Docker Hub con las etiquetas
+\texttt{:latest} y \texttt{:<sha del commit>}, y finalmente se conecta por SSH a una instancia
+Ubuntu Server de Amazon EC2 \cite{awsec2} para descargar la versión nueva, validarla, detener el
+contenedor antiguo y levantar el nuevo en el puerto 80.
+
+Un aspecto central del proyecto es la seguridad: ninguna contraseña, token, dirección IP ni llave
+SSH aparece en el código del repositorio. Todos estos datos se administran como
+\textit{GitHub Secrets}, y la autenticación con Docker Hub se realiza mediante un
+\textit{Personal Access Token} en lugar de la contraseña de la cuenta. Además, el despliegue
+incluye una verificación de salud: la versión nueva se prueba en un puerto temporal antes de
+reemplazar a la que está en producción, de forma que una imagen defectuosa nunca deja al servicio
+fuera de línea.
+
+El presente reporte documenta la arquitectura de la solución, el proceso seguido en cada etapa y
+los resultados obtenidos, apoyados con figuras numeradas que muestran la evidencia de cada paso,
+incluyendo la demostración en vivo en la que un cambio de una línea en la API recorre
+automáticamente todo el pipeline hasta quedar publicado en la nube.
+
+% =====================================================================
+\section{Objetivos}
+% =====================================================================
+
+\subsection{Objetivo general}
+Implementar un pipeline CI/CD automatizado que pruebe, empaquete y despliegue una API REST en
+AWS EC2 cada vez que se publica un cambio en la rama \texttt{main} del repositorio.
+
+\subsection{Objetivos específicos}
+\begin{itemize}
+  \item Desarrollar una API REST con al menos 60 endpoints funcionales.
+  \item Implementar pruebas unitarias y de integración con una cobertura mínima del 70\,\%.
+  \item Contenedorizar la aplicación con un \texttt{Dockerfile} optimizado y un \texttt{.dockerignore}.
+  \item Automatizar pruebas, construcción y publicación de la imagen con GitHub Actions y Docker Hub.
+  \item Desplegar automáticamente en una instancia EC2 por SSH, gestionando los datos sensibles con GitHub Secrets.
+\end{itemize}
+
+% =====================================================================
+\section{Herramientas utilizadas}
+% =====================================================================
+
+\begin{table}[H]
+\centering
+\caption{Tecnologías utilizadas en el proyecto}
+\label{tab:herramientas}
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+\textbf{Herramienta} & \textbf{Uso en el proyecto} \\
+\midrule
+Python 3.12 + Flask 3.1 & Lenguaje y framework de la API REST \\
+Gunicorn 23 & Servidor WSGI de producción dentro del contenedor \\
+pytest + pytest-cov & Pruebas automatizadas y reporte de cobertura \\
+flake8 & Análisis estático (lint) del código \\
+Docker & Construcción de la imagen y ejecución del contenedor \\
+Docker Hub & Registro de imágenes (artefactos) \\
+GitHub / GitHub Actions & Repositorio de código y motor del pipeline CI/CD \\
+AWS EC2 (Ubuntu Server 24.04) & Servidor en la nube donde se ejecuta la API \\
+Visual Studio Code, Postman & Edición de código y pruebas manuales de endpoints \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% =====================================================================
+\section{Arquitectura de la solución}
+% =====================================================================
+
+La Figura~\ref{fig:arquitectura} resume el flujo completo. El desarrollador hace \texttt{git push}
+a la rama \texttt{main}; GitHub Actions ejecuta tres \textit{jobs} encadenados (\texttt{test},
+\texttt{docker} y \texttt{deploy}), cada uno de los cuales solo inicia si el anterior terminó con
+éxito. El resultado final es un contenedor actualizado en la instancia EC2 que atiende peticiones
+HTTP en el puerto 80.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  node distance=0.7cm and 0.6cm,
+  box/.style={draw, rounded corners, align=center, minimum height=1.1cm, text width=2.6cm, font=\footnotesize, fill=white},
+  job/.style={box, fill=blue!8},
+  ext/.style={box, fill=orange!12},
+  aws/.style={box, fill=green!10},
+  arr/.style={-{Stealth[length=2.2mm]}, thick}
+]
+  \node[box] (dev) {Desarrollador\\\texttt{git push}};
+  \node[ext, right=of dev] (gh) {GitHub\\rama \texttt{main}};
+  \node[job, right=of gh] (test) {\textbf{job: test}\\flake8 + pytest\\cobertura $\geq$ 70\,\%};
+  \node[job, below=1.1cm of test] (docker) {\textbf{job: docker}\\build + push\\\texttt{:latest}, \texttt{:sha}};
+  \node[ext, left=of docker] (hub) {Docker Hub\\\texttt{sa-cicd-api}};
+  \node[job, below=1.1cm of docker] (deploy) {\textbf{job: deploy}\\SSH (.pem)\\pull + health check};
+  \node[aws, left=of deploy] (ec2) {AWS EC2 Ubuntu\\contenedor \texttt{api}\\puerto 80};
+  \node[box, left=of ec2] (user) {Usuario\\{\scriptsize\texttt{http://IP/api/...}}};
+  \node[ext, right=0.5cm of docker, text width=2.1cm] (sec) {GitHub\\Secrets};
+
+  \begin{scope}[on background layer]
+    \node[draw, dashed, rounded corners, fit=(test)(docker)(deploy), inner sep=6pt,
+          label={[font=\footnotesize]above:GitHub Actions}] {};
+  \end{scope}
+
+  \draw[arr] (dev) -- (gh);
+  \draw[arr] (gh) -- (test);
+  \draw[arr] (test) -- (docker);
+  \draw[arr] (docker) -- (hub);
+  \draw[arr] (docker) -- (deploy);
+  \draw[arr] (deploy) -- (ec2);
+  \draw[arr, dashed] (hub) -- node[font=\scriptsize, left]{\texttt{docker pull}} (ec2);
+  \draw[arr] (user) -- (ec2);
+  \draw[arr, dotted] (sec) -- (docker);
+  \draw[arr, dotted] (sec) |- (deploy);
+\end{tikzpicture}
+\caption{Arquitectura del pipeline CI/CD implementado}
+\label{fig:arquitectura}
+\end{figure}
+
+El código se organizó por capas, siguiendo la estructura vista en clase: \texttt{routes/} contiene
+las rutas (un archivo por recurso), \texttt{services/} la lógica de negocio y las validaciones,
+\texttt{data/} el almacenamiento, y \texttt{tests/} las pruebas. En la raíz se encuentran el
+\texttt{Dockerfile}, el \texttt{.dockerignore} y el workflow en \texttt{.github/workflows/main.yml}.
+
+% =====================================================================
+\section{Resultados}
+% =====================================================================
+
+\subsection{Desarrollo de la API REST}
+
+Se construyó una API con diez recursos. Para no repetir código, cada recurso define únicamente su
+\textit{esquema} de campos (tipo, obligatoriedad, unicidad, llaves foráneas, límites) en
+\texttt{services/schemas.py}; una fábrica de rutas genera automáticamente sus seis operaciones
+CRUD (listar, consultar, crear, reemplazar, actualizar parcialmente y eliminar), lo que da
+$10 \times 6 = 60$ endpoints. A estos se suman 15 endpoints especiales, para un total de
+\textbf{75 endpoints}. La Figura~\ref{fig:estructura} muestra la organización del proyecto y la
+Tabla~\ref{tab:endpoints} resume los endpoints.
+
+\captura{estructura.png}{Estructura del proyecto en Visual Studio Code}{fig:estructura}
+
+\begin{table}[H]
+\centering
+\caption{Resumen de los 75 endpoints de la API}
+\label{tab:endpoints}
+\footnotesize
+\begin{tabularx}{\textwidth}{@{}llX@{}}
+\toprule
+\textbf{Método} & \textbf{Ruta} & \textbf{Descripción} \\
+\midrule
+\multicolumn{3}{@{}l}{\textit{CRUD de los 10 recursos (60 endpoints)}} \\
+GET    & \texttt{/api/<recurso>}      & Listar con filtros, búsqueda, orden y paginación \\
+GET    & \texttt{/api/<recurso>/\{id\}} & Consultar un registro \\
+POST   & \texttt{/api/<recurso>}      & Crear un registro \\
+PUT    & \texttt{/api/<recurso>/\{id\}} & Reemplazar un registro completo \\
+PATCH  & \texttt{/api/<recurso>/\{id\}} & Actualizar campos específicos \\
+DELETE & \texttt{/api/<recurso>/\{id\}} & Eliminar (409 si otro registro lo usa) \\
+\midrule
+\multicolumn{3}{@{}l}{\textit{Endpoints especiales (15)}} \\
+GET  & \texttt{/api/health}                    & Estado del servicio \\
+GET  & \texttt{/api/version}                   & Versión, mensaje y commit desplegado \\
+GET  & \texttt{/api/endpoints}                 & Lista de endpoints registrados \\
+GET  & \texttt{/api/stats}                     & Registros por tabla \\
+POST & \texttt{/api/admin/reset}               & Reinicia los datos iniciales \\
+GET  & \texttt{/api/categories/\{id\}/products} & Productos de una categoría \\
+GET  & \texttt{/api/suppliers/\{id\}/products}  & Productos de un proveedor \\
+GET  & \texttt{/api/products/low-stock}        & Productos con poco inventario \\
+GET  & \texttt{/api/products/\{id\}/reviews}    & Reseñas de un producto \\
+GET  & \texttt{/api/products/\{id\}/rating}     & Calificación promedio \\
+GET  & \texttt{/api/customers/\{id\}/orders}    & Pedidos de un cliente \\
+POST & \texttt{/api/orders/\{id\}/cancel}       & Cancelar un pedido \\
+GET  & \texttt{/api/departments/\{id\}/employees} & Empleados de un departamento \\
+POST & \texttt{/api/users/\{id\}/toggle-active} & Activar o desactivar un usuario \\
+POST & \texttt{/api/coupons/validate}          & Validar un cupón \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Todas las respuestas comparten el formato \texttt{\{"statusCode": ..., "data": ...\}} y los errores
+\texttt{\{"statusCode": ..., "error": "mensaje"\}}, con códigos HTTP coherentes: 201 al crear, 400
+ante datos inválidos, 404 si el recurso no existe, 409 ante duplicados o registros referenciados y
+415 cuando el cuerpo no es JSON. La Figura~\ref{fig:endpoints} muestra el endpoint
+\texttt{/api/endpoints}, que lista los 75 endpoints registrados en la aplicación.
+
+\captura{endpoints.png}{Respuesta de \texttt{GET /api/endpoints} con el total de 75 endpoints}{fig:endpoints}
+
+\subsection{Pruebas automatizadas y cobertura}
+
+Las pruebas se escribieron con pytest usando el cliente de pruebas de Flask, que permite hacer
+peticiones HTTP a la aplicación sin levantar un servidor. Un \textit{fixture} recarga los datos
+iniciales antes de cada prueba para que sean independientes entre sí. Se implementaron 181 pruebas
+en tres archivos: \texttt{test\_crud\_resources.py} prueba con \textit{parametrización} los seis
+endpoints CRUD de los diez recursos (casos exitosos, datos inválidos, campos no permitidos, cuerpo
+sin JSON, ids inexistentes); \texttt{test\_business\_rules.py} verifica reglas de negocio como la
+unicidad del email, las llaves foráneas, el cálculo del total de los pedidos y los endpoints
+anidados; y \texttt{test\_system.py} cubre los endpoints de sistema y el manejo de errores 404, 405
+y 500. La Figura~\ref{fig:pytest} muestra la ejecución.
+
+\begin{figure}[H]
+\centering
+\begin{minipage}{0.95\textwidth}
+\begin{lstlisting}[style=term]
+$ pytest -v
+tests/test_business_rules.py::test_duplicate_email_conflict PASSED       [  0%]
+tests/test_business_rules.py::test_patch_keeps_own_unique_value PASSED   [  1%]
+tests/test_business_rules.py::test_patch_duplicate_unique_value PASSED   [  1%]
+tests/test_business_rules.py::test_foreign_key_must_exist PASSED         [  2%]
+tests/test_business_rules.py::test_cannot_delete_referenced_record PASSED [  2%]
+tests/test_business_rules.py::test_email_is_normalized PASSED            [  3%]
+...
+tests/test_system.py::test_method_not_allowed PASSED                     [ 99%]
+tests/test_system.py::test_internal_error_handler PASSED                 [100%]
+======================== 181 passed in 7.68s ========================
+\end{lstlisting}
+\end{minipage}
+\caption{Ejecución local de las 181 pruebas con pytest}
+\label{fig:pytest}
+\end{figure}
+
+La cobertura se mide con pytest-cov. En \texttt{pytest.ini} se configuró la opción
+\texttt{-{}-cov-fail-under=70}, de modo que si la cobertura baja del 70\,\% el comando termina con
+error y el pipeline se detiene. Como se observa en la Figura~\ref{fig:cobertura}, se obtuvo una
+cobertura total del \textbf{99.76\,\%}: de 419 sentencias solo una no se ejecuta.
+
+\begin{figure}[H]
+\centering
+\begin{minipage}{0.95\textwidth}
+\begin{lstlisting}[style=term]
+Name                       Stmts   Miss  Cover   Missing
+--------------------------------------------------------
+app.py                        24      0   100%
+config.py                      2      0   100%
+data/store.py                 25      0   100%
+routes/crud.py                35      0   100%
+routes/products.py            22      0   100%
+routes/system.py              32      0   100%
+...                          (resto de routes/ al 100%)
+services/__init__.py          16      0   100%
+services/crud_service.py      95      1    99%   57
+services/schemas.py           11      0   100%
+services/validators.py        62      0   100%
+--------------------------------------------------------
+TOTAL                        419      1    99%
+Required test coverage of 70% reached. Total coverage: 99.76%
+181 passed in 7.68s
+\end{lstlisting}
+\end{minipage}
+\caption{Reporte de cobertura de código (umbral mínimo: 70\,\%)}
+\label{fig:cobertura}
+\end{figure}
+
+\subsection{Contenedorización}
+
+El \texttt{Dockerfile} (Figura~\ref{fig:dockerfile}) usa una construcción en dos etapas
+(\textit{multi-stage build}): la primera instala las dependencias en un entorno virtual y la
+segunda copia únicamente ese entorno y el código a una imagen \texttt{python:3.12-slim} limpia,
+sin compiladores ni cachés de pip. Además, el contenedor se ejecuta con un usuario sin privilegios
+(\texttt{appuser}), define un \texttt{HEALTHCHECK} contra \texttt{/api/health} y recibe el hash del
+commit como argumento de construcción para exponerlo en \texttt{/api/version}. Las dependencias se
+copian antes que el código para aprovechar la caché de capas: si solo cambia el código, no se
+reinstalan las librerías \cite{dockerdocs}.
+
+\begin{figure}[H]
+\centering
+\begin{minipage}{0.95\textwidth}
+\begin{lstlisting}
+FROM python:3.12-slim AS builder
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+FROM python:3.12-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PATH="/opt/venv/bin:$PATH"
+RUN useradd --create-home --uid 1000 appuser
+WORKDIR /app
+COPY --from=builder /opt/venv /opt/venv
+COPY --chown=appuser:appuser . .
+ARG GIT_SHA=local
+ENV GIT_SHA=$GIT_SHA
+USER appuser
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=3s CMD python -c "import urllib.request; \
+  urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=2)" || exit 1
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "1", "--threads", "4", "app:create_app()"]
+\end{lstlisting}
+\end{minipage}
+\caption{Dockerfile multi-etapa de la API}
+\label{fig:dockerfile}
+\end{figure}
+
+El archivo \texttt{.dockerignore} excluye de la imagen todo lo que no se necesita en producción:
+el directorio \texttt{.git}, cachés de Python, entornos virtuales, las pruebas, reportes de
+cobertura, archivos \texttt{.env}, llaves \texttt{.pem}, logs, la documentación y el reporte.
+Gracias a esto, la imagen final ocupa 49.4\,MB comprimida. La Figura~\ref{fig:dockerlocal} muestra
+la construcción y prueba local del contenedor.
+
+\begin{figure}[H]
+\centering
+\begin{minipage}{0.95\textwidth}
+\begin{lstlisting}[style=term]
+$ docker build -t sa-cicd-api --build-arg GIT_SHA=test123 .
+ => naming to docker.io/library/sa-cicd-api:latest                    done
+$ docker run -d --name sa-test -p 8089:8000 sa-cicd-api
+$ curl http://localhost:8089/api/version
+{"statusCode":200,"data":{"version":"1.0.0",
+ "message":"Hola desde el pipeline CI/CD - IDGS16","commit":"test123"}}
+$ docker images sa-cicd-api
+IMAGE                ID             DISK USAGE   CONTENT SIZE
+sa-cicd-api:latest   3298c72c334e        205MB         49.4MB
+\end{lstlisting}
+\end{minipage}
+\caption{Construcción y ejecución local de la imagen Docker}
+\label{fig:dockerlocal}
+\end{figure}
+
+\subsection{Integración continua con GitHub Actions}
+
+El workflow \texttt{.github/workflows/main.yml} se dispara con eventos \texttt{push} y
+\texttt{pull\_request} sobre la rama \texttt{main}. El primer job, \texttt{test}, instala
+Python 3.12, ejecuta \texttt{flake8} y luego \texttt{pytest -v}, que imprime en el log la tabla de
+cobertura; adicionalmente, el resumen de cobertura se publica en formato Markdown en la página de
+la ejecución (\texttt{\$GITHUB\_STEP\_SUMMARY}) y el archivo \texttt{coverage.xml} se guarda como
+artefacto. En los \textit{pull requests} solo corre este job; los de construcción y despliegue se
+ejecutan únicamente con \texttt{push} a \texttt{main}. La Figura~\ref{fig:actions} muestra una
+ejecución exitosa del pipeline y la Figura~\ref{fig:actionscov} el resumen de cobertura en los
+logs.
+
+\captura{actions_pipeline.png}{Ejecución exitosa del pipeline con los jobs test, docker y deploy}{fig:actions}
+
+\captura{actions_cobertura.png}{Resumen de cobertura mostrado en los logs de GitHub Actions}{fig:actionscov}
+
+\subsection{Gestión de artefactos en Docker Hub}
+
+El job \texttt{docker} se autentica en Docker Hub con la acción \texttt{docker/login-action}
+usando un \textit{Personal Access Token} con permisos de lectura y escritura, almacenado en el
+secreto \texttt{DOCKERHUB\_TOKEN}. Después construye la imagen con Buildx (con caché de capas entre
+ejecuciones) y la publica con dos etiquetas: \texttt{:latest}, que siempre apunta a la versión más
+reciente, y \texttt{:\$\{\{ github.sha \}\}}, que identifica de forma única el commit que la generó
+y permite regresar a cualquier versión anterior. La Figura~\ref{fig:dockerhub} muestra el
+repositorio en Docker Hub con ambas etiquetas.
+
+\captura{dockerhub_tags.png}{Repositorio en Docker Hub con las etiquetas \texttt{latest} y el hash del commit}{fig:dockerhub}
+
+\subsection{Infraestructura en AWS EC2}
+
+Se creó una instancia EC2 con Ubuntu Server 24.04 LTS de tipo \texttt{t2.micro} (capa gratuita)
+y se descargó su par de llaves en formato \texttt{.pem} (Figura~\ref{fig:ec2}). El
+\textit{Security Group} asociado permite tráfico entrante únicamente en el puerto 22 (SSH), usado
+por GitHub Actions para el despliegue, y en el puerto 80 (HTTP), por donde se atiende a los
+usuarios (Figura~\ref{fig:sg}). Docker se instaló con el script \texttt{scripts/setup\_ec2.sh}
+incluido en el repositorio, que además agrega al usuario \texttt{ubuntu} al grupo
+\texttt{docker}.
+
+\captura{ec2_instancia.png}{Instancia EC2 Ubuntu Server en ejecución}{fig:ec2}
+
+\captura{ec2_security_group.png}{Reglas de entrada del Security Group (puertos 22 y 80)}{fig:sg}
+
+\subsection{Seguridad: GitHub Secrets}
+
+Ningún dato sensible se escribió en el código. En el repositorio se configuraron cinco secretos
+(Figura~\ref{fig:secrets}): \texttt{DOCKERHUB\_USERNAME}, \texttt{DOCKERHUB\_TOKEN},
+\texttt{EC2\_HOST} (IP pública de la instancia), \texttt{EC2\_USER} y \texttt{EC2\_SSH\_KEY}
+(contenido del archivo \texttt{.pem}). GitHub los cifra, los inyecta solo durante la ejecución y
+los oculta (\texttt{***}) en los logs. Como medida adicional, \texttt{.gitignore} y
+\texttt{.dockerignore} excluyen archivos \texttt{.env}, \texttt{*.pem} y \texttt{*.key}.
+
+\captura{github_secrets.png}{Secretos configurados en GitHub (los valores no son visibles)}{fig:secrets}
+
+\subsection{Despliegue continuo en EC2}
+
+El job \texttt{deploy} se conecta a la instancia por SSH con \texttt{appleboy/ssh-action} y
+ejecuta el siguiente proceso:
+
+\begin{enumerate}
+  \item Descarga la imagen \texttt{:latest} recién publicada en Docker Hub.
+  \item Levanta la versión nueva en un contenedor temporal (puerto 8081) y consulta
+        \texttt{/api/health} hasta 20 veces. Si no responde, muestra sus logs, lo elimina y
+        marca el pipeline como fallido \textbf{sin tocar} la versión en producción.
+  \item Si está sana, elimina el contenedor temporal, detiene el contenedor antiguo
+        (\texttt{api}) y levanta la nueva versión mapeada al puerto 80 con
+        \texttt{--restart unless-stopped}.
+  \item Verifica que \texttt{/api/version} responda con el hash del commit del \textit{push}, lo
+        que comprueba que realmente se está sirviendo la versión nueva, y limpia imágenes viejas.
+\end{enumerate}
+
+Como la imagen ya está descargada y validada antes de detener la versión anterior, el cambio de
+contenedor tarda alrededor de un segundo, reduciendo el tiempo de inactividad al mínimo. La
+Figura~\ref{fig:deploylog} muestra el log del despliegue, la Figura~\ref{fig:dockerps} el
+contenedor corriendo en la EC2 y la Figura~\ref{fig:apipublica} la API respondiendo en la IP
+pública.
+
+\captura{actions_deploy_log.png}{Log del job deploy en GitHub Actions}{fig:deploylog}
+
+\captura{ec2_docker_ps.png}{Contenedor \texttt{api} en ejecución en la EC2 (\texttt{docker ps})}{fig:dockerps}
+
+\captura{api_publica.png}{API respondiendo en \texttt{http://<IP\_EC2>/api/health}}{fig:apipublica}
+
+\subsection{Demostración práctica}
+
+Para la demostración en vivo se modificó una sola línea del archivo \texttt{config.py}, la
+constante \texttt{MESSAGE}, y se hizo \texttt{git commit} y \texttt{git push} a \texttt{main}. Antes
+del cambio, \texttt{GET /api/version} mostraba el mensaje original y el hash del commit anterior
+(Figura~\ref{fig:antes}). El pipeline ejecutó las pruebas, publicó la nueva etiqueta en Docker Hub y
+actualizó el servidor; al recargar la URL se obtuvo el mensaje nuevo junto con el hash del nuevo
+commit (Figura~\ref{fig:despues}), sin haber entrado manualmente al servidor.
+
+\captura{demo_antes.png}{\texttt{/api/version} antes del \texttt{git push}}{fig:antes}
+
+\captura{demo_despues.png}{\texttt{/api/version} después del \texttt{git push}: mensaje y commit nuevos}{fig:despues}
+
+% =====================================================================
+\section{Conclusiones}
+% =====================================================================
+
+El proyecto permitió construir de principio a fin un flujo de trabajo CI/CD como el que se usa en
+la industria. Se desarrolló una API REST con 75 endpoints, organizada en capas de rutas, servicios
+y datos, y respaldada por 181 pruebas automatizadas con una cobertura del 99.76\,\%. Más allá del
+número, las pruebas resultaron ser la pieza que da confianza a todo el pipeline: como el umbral de
+cobertura y el resultado de las pruebas son condiciones obligatorias para continuar, ningún cambio
+que rompa la API puede llegar a Docker Hub ni al servidor. Diseñar la API a partir de esquemas y
+una fábrica de rutas también demostró el valor de no repetir código: agregar un recurso nuevo con
+sus seis endpoints requiere solo unas cuantas líneas, y queda probado automáticamente por las
+pruebas parametrizadas.
+
+La contenedorización con Docker resolvió el problema de las diferencias entre entornos: la misma
+imagen que se probó localmente es la que se publica y se ejecuta en EC2, identificada con el hash
+de su commit, lo que facilita saber qué versión está en producción y regresar a una anterior si es
+necesario. GitHub Actions unió todas las piezas en un solo proceso reproducible y visible para
+todo el equipo, y GitHub Secrets permitió automatizar el acceso a Docker Hub y a AWS sin exponer
+contraseñas, tokens, IPs ni llaves en un repositorio público, que es uno de los errores de
+seguridad más comunes en proyectos reales.
+
+Finalmente, la demostración práctica evidenció el beneficio principal de DevOps: un cambio de una
+línea pasó de la computadora del desarrollador a producción en pocos minutos, sin intervención
+manual y con verificaciones automáticas de salud antes y después del despliegue. Como trabajo
+futuro, la solución podría incorporar una base de datos persistente (por ejemplo, Amazon RDS),
+un proxy inverso con despliegue \textit{blue-green} para eliminar por completo el segundo de
+inactividad durante el cambio de contenedor, y HTTPS mediante un certificado TLS.
+
+% =====================================================================
+\renewcommand{\refname}{Fuentes de información}
+\begin{thebibliography}{9}
+% =====================================================================
+
+\bibitem{dockerdocs}
+Docker Inc. (2026). \textit{Building best practices}. Docker Documentation.
+\url{https://docs.docker.com/build/building/best-practices/}
+
+\bibitem{flaskdocs}
+Pallets Projects. (2026). \textit{Flask documentation (3.1.x)}.
+\url{https://flask.palletsprojects.com/}
+
+\bibitem{fowler2006}
+Fowler, M. (2006). \textit{Continuous integration}. martinfowler.com.
+\url{https://martinfowler.com/articles/continuousIntegration.html}
+
+\bibitem{githubactions}
+GitHub. (2026). \textit{GitHub Actions documentation}. GitHub Docs.
+\url{https://docs.github.com/en/actions}
+
+\bibitem{humble2010}
+Humble, J., \& Farley, D. (2010). \textit{Continuous delivery: Reliable software releases through
+build, test, and deployment automation}. Addison-Wesley.
+
+\bibitem{kim2016}
+Kim, G., Humble, J., Debois, P., \& Willis, J. (2016). \textit{The DevOps handbook: How to create
+world-class agility, reliability, and security in technology organizations}. IT Revolution Press.
+
+\bibitem{awsec2}
+Amazon Web Services. (2026). \textit{Amazon EC2 user guide}. AWS Documentation.
+\url{https://docs.aws.amazon.com/ec2/}
+
+\end{thebibliography}
+
+\end{document}

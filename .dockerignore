@@ -1,0 +1,44 @@
+# Control de versiones y CI
+.git/
+.github/
+.gitignore
+
+# Python: cachés, entornos virtuales y reportes
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Pruebas y herramientas de desarrollo (no van en producción)
+tests/
+pytest.ini
+.coveragerc
+.flake8
+requirements-dev.txt
+
+# Secretos y logs
+.env
+.env.*
+*.pem
+*.key
+*.log
+logs/
+
+# Documentación, reporte y scripts de la EC2
+README.md
+reporte/
+scripts/
+
+# Editores / SO
+.vscode/
+.idea/
+.claude/
+.DS_Store
+Thumbs.db
+
+Dockerfile
+.dockerignore

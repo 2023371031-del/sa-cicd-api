@@ -1,0 +1,31 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Nunca subir secretos
+.env
+.env.*
+*.pem
+*.key
+
+*.log
+.vscode/
+.idea/
+.claude/
+.DS_Store
+Thumbs.db
+
+# Archivos auxiliares de LaTeX
+reporte/*.aux
+reporte/*.log
+reporte/*.out
+reporte/*.toc
+reporte/*.lof
+reporte/*.synctex.gz
+reporte/*.fls
+reporte/*.fdb_latexmk

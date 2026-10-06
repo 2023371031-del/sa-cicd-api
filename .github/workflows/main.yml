@@ -1,0 +1,147 @@
+name: CI/CD - API REST
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  IMAGE_NAME: sa-cicd-api
+
+jobs:
+  # ------------------------------------------------------------------
+  # 1) CI: lint + pruebas + reporte de cobertura (umbral mínimo 70 %)
+  # ------------------------------------------------------------------
+  test:
+    name: Pruebas y cobertura
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Instalar dependencias
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint (flake8)
+        run: flake8 .
+
+      - name: Ejecutar pruebas con cobertura
+        # pytest.ini ya incluye --cov-report=term-missing y --cov-fail-under=70
+        run: pytest -v
+
+      - name: Resumen de cobertura
+        if: always()
+        run: |
+          echo "## Cobertura de código" >> "$GITHUB_STEP_SUMMARY"
+          coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY"
+          coverage report
+
+      - name: Guardar reporte de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+
+  # ------------------------------------------------------------------
+  # 2) Artefacto: construir y publicar la imagen en Docker Hub
+  #    (solo en push a main, nunca en pull requests)
+  # ------------------------------------------------------------------
+  docker:
+    name: Build y push a Docker Hub
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+
+      - name: Login en Docker Hub (Personal Access Token)
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Construir y publicar imagen (:latest y :sha)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: GIT_SHA=${{ github.sha }}
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ------------------------------------------------------------------
+  # 3) CD: desplegar en AWS EC2 por SSH
+  # ------------------------------------------------------------------
+  deploy:
+    name: Despliegue en AWS EC2
+    needs: docker
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-ec2
+      cancel-in-progress: false
+    steps:
+      - name: Desplegar nueva versión por SSH
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}
+          TAG: ${{ github.sha }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: IMAGE,TAG
+          script_stop: true
+          script: |
+            set -e
+            echo ">> Descargando $IMAGE:latest desde Docker Hub"
+            docker pull "$IMAGE:latest"
+
+            # 1. Se levanta la versión nueva en un puerto temporal y se verifica
+            #    ANTES de tocar la versión que está en producción.
+            docker rm -f api-candidate 2>/dev/null || true
+            docker run -d --name api-candidate -p 8081:8000 "$IMAGE:latest"
+            healthy=""
+            for i in $(seq 1 20); do
+              if curl -fs http://localhost:8081/api/health > /dev/null; then healthy=1; break; fi
+              sleep 1
+            done
+            if [ -z "$healthy" ]; then
+              echo "!! La nueva versión no respondió; se conserva la versión actual"
+              docker logs api-candidate || true
+              docker rm -f api-candidate
+              exit 1
+            fi
+            docker rm -f api-candidate
+
+            # 2. Se detiene el contenedor antiguo y se levanta el nuevo en el puerto 80
+            echo ">> Reemplazando contenedor en el puerto 80"
+            docker rm -f api 2>/dev/null || true
+            docker run -d --name api --restart unless-stopped -p 80:8000 "$IMAGE:latest"
+
+            # 3. Verificación final: el commit desplegado debe ser el de este push
+            for i in $(seq 1 20); do
+              if curl -fs http://localhost/api/version | grep -q "$TAG"; then
+                echo ">> Despliegue OK, commit $TAG en línea"
+                docker image prune -f
+                exit 0
+              fi
+              sleep 1
+            done
+            echo "!! El servidor no responde con el commit $TAG"
+            exit 1
