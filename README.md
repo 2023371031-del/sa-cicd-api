@@ -1,5 +1,7 @@
 # SA — Pipeline CI/CD para API REST (Flask + Docker + GitHub Actions + AWS EC2)
 
+Repositorio: https://github.com/2023371031-del/sa-cicd-api
+
 API REST en **Python/Flask** con **6 endpoints**, **31 pruebas** con **pytest** (cobertura del 99 %,
 umbral mínimo exigido: 70 %) y un pipeline de **GitHub Actions** que en cada `git push` a `main`:
 
@@ -126,7 +128,7 @@ docker rm -f api
 
    ```bash
    ssh -i llave.pem ubuntu@<IP_EC2>
-   curl -fsSL https://raw.githubusercontent.com/<usuario>/<repo>/main/scripts/setup_ec2.sh | sh
+   curl -fsSL https://raw.githubusercontent.com/2023371031-del/sa-cicd-api/main/scripts/setup_ec2.sh | sh
    # o copiar scripts/setup_ec2.sh con scp y ejecutar: sh setup_ec2.sh
    exit   # volver a entrar para que el grupo docker surta efecto
    ```
