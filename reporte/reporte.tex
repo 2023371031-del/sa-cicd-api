@@ -205,8 +205,8 @@ flake8 & Análisis estático (lint) del código \\
 Docker & Construcción de la imagen y ejecución del contenedor \\
 Docker Hub & Registro de imágenes (artefactos) \\
 GitHub / GitHub Actions & Repositorio de código y motor del pipeline CI/CD \\
-AWS EC2 (Ubuntu Server 24.04) & Servidor en la nube donde se ejecuta la API \\
-Visual Studio Code, Postman & Edición de código y pruebas manuales de endpoints \\
+AWS EC2 (Ubuntu Server 26.04, \texttt{t3.micro}) & Servidor en la nube donde se ejecuta la API \\
+Visual Studio Code, curl & Edición de código y pruebas manuales de endpoints \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -281,7 +281,7 @@ revisa que el email no se repita y modifica los datos; y \texttt{data/store.py} 
 usuarios en memoria a partir de \texttt{data/seed.json}. La Figura~\ref{fig:estructura} muestra la
 organización del proyecto y la Tabla~\ref{tab:endpoints} resume los endpoints.
 
-\captura{estructura.png}{Estructura del proyecto en Visual Studio Code}{fig:estructura}
+\captura{estructura.png}{Estructura de archivos del repositorio}{fig:estructura}
 
 \begin{table}[H]
 \centering
@@ -306,9 +306,11 @@ Todas las respuestas comparten el formato \texttt{\{"statusCode": ..., "data": .
 \texttt{\{"statusCode": ..., "error": "mensaje"\}}, con códigos HTTP coherentes: 201 al crear, 400
 ante datos inválidos (campos faltantes, vacíos, de tipo incorrecto, email mal formado o campos no
 permitidos como \texttt{id}), 404 si el usuario no existe, 409 si el email ya está registrado y 415
-cuando el cuerpo no es JSON. La Figura~\ref{fig:endpoints} muestra una prueba de los endpoints.
+cuando el cuerpo no es JSON. La Figura~\ref{fig:endpoints} muestra la prueba de los seis endpoints
+con \texttt{curl} directamente contra la IP pública de la EC2: se consulta el estado, se listan los
+usuarios, se consulta uno, se crea el usuario 4, se actualiza su rol y finalmente se elimina.
 
-\captura{endpoints.png}{Prueba de los endpoints de usuarios en Postman}{fig:endpoints}
+\captura{endpoints.png}{Prueba de los 6 endpoints contra la IP pública de la EC2}{fig:endpoints}
 
 \subsection{Pruebas automatizadas y cobertura}
 
@@ -471,15 +473,17 @@ repositorio en Docker Hub con ambas etiquetas.
 
 \subsection{Infraestructura en AWS EC2}
 
-Se creó una instancia EC2 con Ubuntu Server 24.04 LTS de tipo \texttt{t2.micro} (capa gratuita)
-y se descargó su par de llaves en formato \texttt{.pem} (Figura~\ref{fig:ec2}). El
-\textit{Security Group} asociado permite tráfico entrante únicamente en el puerto 22 (SSH), usado
-por GitHub Actions para el despliegue, y en el puerto 80 (HTTP), por donde se atiende a los
-usuarios (Figura~\ref{fig:sg}). Docker se instaló con el script \texttt{scripts/setup\_ec2.sh}
-incluido en el repositorio, que además agrega al usuario \texttt{ubuntu} al grupo
-\texttt{docker}.
+Se utilizó una instancia EC2 \texttt{t3.micro} con Ubuntu Server 26.04 LTS en la región
+\texttt{us-east-2} (Ohio), con IP pública \texttt{18.223.115.56}, a la que se accede con un par de
+llaves en formato \texttt{.pem} (Figura~\ref{fig:ec2}). Se reutilizó la instancia de la práctica
+anterior para no consumir créditos adicionales; ya contaba con Docker Engine instalado y con el
+usuario \texttt{ubuntu} dentro del grupo \texttt{docker}. Para preparar una instancia nueva, el
+repositorio incluye el script \texttt{scripts/setup\_ec2.sh}, que instala Docker y configura ese
+grupo. Al \textit{Security Group} se le agregó la regla de entrada HTTP en el puerto 80, por donde se
+atiende a los usuarios, y se abrió el puerto 22 (SSH) a cualquier origen, ya que GitHub Actions se
+conecta desde direcciones IP que cambian en cada ejecución (Figura~\ref{fig:sg}).
 
-\captura{ec2_instancia.png}{Instancia EC2 Ubuntu Server en ejecución}{fig:ec2}
+\captura{ec2_instancia.png}{Instancia EC2 en ejecución en la consola de AWS}{fig:ec2}
 
 \captura{ec2_security_group.png}{Reglas de entrada del Security Group (puertos 22 y 80)}{fig:sg}
 
@@ -492,7 +496,7 @@ Ningún dato sensible se escribió en el código. En el repositorio se configura
 los oculta (\texttt{***}) en los logs. Como medida adicional, \texttt{.gitignore} y
 \texttt{.dockerignore} excluyen archivos \texttt{.env}, \texttt{*.pem} y \texttt{*.key}.
 
-\captura{github_secrets.png}{Secretos configurados en GitHub (los valores no son visibles)}{fig:secrets}
+\captura{github_secrets.png}{Secretos configurados en el repositorio (GitHub nunca muestra sus valores)}{fig:secrets}
 
 \subsection{Despliegue continuo en EC2}
 
@@ -512,7 +516,8 @@ ejecuta el siguiente proceso:
 \end{enumerate}
 
 Como la imagen ya está descargada y validada antes de detener la versión anterior, el cambio de
-contenedor tarda alrededor de un segundo, reduciendo el tiempo de inactividad al mínimo. La
+contenedor tarda alrededor de un segundo, reduciendo el tiempo de inactividad al mínimo. En las
+pruebas realizadas, el job completo de despliegue tardó unos 10 segundos. La
 Figura~\ref{fig:deploylog} muestra el log del despliegue, la Figura~\ref{fig:dockerps} el
 contenedor corriendo en la EC2 y la Figura~\ref{fig:apipublica} la API respondiendo en la IP
 pública.
@@ -521,18 +526,21 @@ pública.
 
 \captura{ec2_docker_ps.png}{Contenedor \texttt{api} en ejecución en la EC2 (\texttt{docker ps})}{fig:dockerps}
 
-\captura{api_publica.png}{API respondiendo en \texttt{http://<IP\_EC2>/api/health}}{fig:apipublica}
+\captura{api_publica.png}{API respondiendo en el navegador en \texttt{http://18.223.115.56/api/health}}{fig:apipublica}
 
 \subsection{Demostración práctica}
 
 Para la demostración en vivo se modificó una sola línea del archivo \texttt{config.py}, la
 constante \texttt{MESSAGE}, y se hizo \texttt{git commit} y \texttt{git push} a \texttt{main}. Antes
-del cambio, \texttt{GET /api/health} mostraba el mensaje original y el hash del commit anterior
-(Figura~\ref{fig:antes}). El pipeline ejecutó las pruebas, publicó la nueva etiqueta en Docker Hub y
-actualizó el servidor; al recargar la URL se obtuvo el mensaje nuevo junto con el hash del nuevo
-commit (Figura~\ref{fig:despues}), sin haber entrado manualmente al servidor.
+del cambio, \texttt{GET /api/health} mostraba el mensaje ``Hola desde el pipeline CI/CD - IDGS16''
+y el commit \texttt{47737e5} (Figura~\ref{fig:antes}). El \textit{push} disparó la ejecución
+\#6 del pipeline (Figura~\ref{fig:actions}), que en 59 segundos ejecutó las pruebas, publicó la
+etiqueta \texttt{1a63431...} en Docker Hub (Figura~\ref{fig:dockerhub}) y actualizó el servidor. Al
+volver a consultar la URL se obtuvo el mensaje nuevo, ``Demo en vivo: versión 2 desplegada
+automáticamente - IDGS16'', junto con el commit \texttt{1a63431} (Figura~\ref{fig:despues}), sin
+haber entrado manualmente al servidor.
 
-\captura{demo_antes.png}{\texttt{/api/health} antes del \texttt{git push}}{fig:antes}
+\captura{demo_antes.png}{\texttt{/api/health} antes del cambio, y el \texttt{git commit} / \texttt{git push} de la demo}{fig:antes}
 
 \captura{demo_despues.png}{\texttt{/api/health} después del \texttt{git push}: mensaje y commit nuevos}{fig:despues}
 
