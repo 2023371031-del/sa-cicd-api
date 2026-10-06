@@ -3,44 +3,5 @@
     {"id": 1, "name": "Ana López", "email": "ana@mail.com", "role": "admin", "active": true},
     {"id": 2, "name": "Luis Pérez", "email": "luis@mail.com", "role": "user", "active": true},
     {"id": 3, "name": "María García", "email": "maria@mail.com", "role": "user", "active": false}
-  ],
-  "categories": [
-    {"id": 1, "name": "Bebidas", "description": "Refrescos, agua y jugos"},
-    {"id": 2, "name": "Botanas", "description": "Papas, cacahuates y galletas"},
-    {"id": 3, "name": "Limpieza", "description": "Artículos de limpieza del hogar"}
-  ],
-  "suppliers": [
-    {"id": 1, "name": "Distribuidora del Norte", "email": "ventas@dnorte.com", "phone": "8111111111"},
-    {"id": 2, "name": "Abarrotes Centro", "email": "contacto@acentro.com", "phone": "5522222222"}
-  ],
-  "products": [
-    {"id": 1, "name": "Agua 1L", "price": 15.0, "stock": 120, "category_id": 1, "supplier_id": 1},
-    {"id": 2, "name": "Refresco 600ml", "price": 22.5, "stock": 8, "category_id": 1, "supplier_id": 1},
-    {"id": 3, "name": "Papas 45g", "price": 18.0, "stock": 60, "category_id": 2, "supplier_id": 2},
-    {"id": 4, "name": "Cloro 1L", "price": 25.0, "stock": 3, "category_id": 3, "supplier_id": 2}
-  ],
-  "customers": [
-    {"id": 1, "name": "Carlos Ruiz", "email": "carlos@mail.com", "phone": "4421234567"},
-    {"id": 2, "name": "Sofía Hernández", "email": "sofia@mail.com", "phone": "4427654321"}
-  ],
-  "orders": [
-    {"id": 1, "customer_id": 1, "product_id": 1, "quantity": 2, "status": "paid", "total": 30.0},
-    {"id": 2, "customer_id": 2, "product_id": 3, "quantity": 1, "status": "pending", "total": 18.0}
-  ],
-  "departments": [
-    {"id": 1, "name": "Ventas"},
-    {"id": 2, "name": "Sistemas"}
-  ],
-  "employees": [
-    {"id": 1, "name": "Jorge Ramírez", "email": "jorge@empresa.com", "department_id": 1, "salary": 12000.0},
-    {"id": 2, "name": "Laura Torres", "email": "laura@empresa.com", "department_id": 2, "salary": 18000.0}
-  ],
-  "reviews": [
-    {"id": 1, "product_id": 1, "customer_id": 1, "rating": 5, "comment": "Muy buena"},
-    {"id": 2, "product_id": 3, "customer_id": 2, "rating": 3, "comment": "Normal"}
-  ],
-  "coupons": [
-    {"id": 1, "code": "BIENVENIDA10", "discount": 10, "active": true},
-    {"id": 2, "code": "VERANO25", "discount": 25, "active": false}
   ]
 }

@@ -1,7 +1,7 @@
 """Formato estándar de respuesta: {"statusCode": <código>, "data": ...} o {"statusCode", "error"}."""
 from flask import jsonify, request
 
-from services.crud_service import ServiceError
+from services.user_service import ServiceError
 
 
 def ok(data, status=200):

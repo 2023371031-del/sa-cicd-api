@@ -16,7 +16,7 @@ _next_ids = {}
 
 
 def reset():
-    """Vuelve a cargar los datos iniciales (lo usan las pruebas y POST /api/admin/reset)."""
+    """Vuelve a cargar los datos iniciales (lo usan las pruebas)."""
     with open(SEED_PATH, encoding="utf-8") as f:
         seed = json.load(f)
     with lock:

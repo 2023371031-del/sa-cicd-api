@@ -1,15 +1,11 @@
-"""Validación genérica de cuerpos JSON contra un esquema de campos.
+"""Validación de cuerpos JSON contra un esquema de campos.
 
 Un esquema es un diccionario {campo: reglas}. Reglas soportadas:
-    type      -> "str", "email", "int", "number", "bool" o "enum"
-    required  -> el campo es obligatorio al crear / reemplazar (PUT)
-    default   -> valor por omisión si no se manda al crear
-    min, max  -> límites para números
-    max_len   -> longitud máxima para texto
-    choices   -> valores permitidos para "enum"
-    unique    -> no puede repetirse en la tabla (lo revisa el servicio)
-    ref       -> llave foránea: nombre de la tabla a la que apunta (lo revisa el servicio)
-    transform -> "lower" o "upper" para normalizar texto
+    type     -> "str", "email", "bool" o "enum"
+    required -> el campo es obligatorio al crear
+    default  -> valor por omisión si no se manda al crear
+    max_len  -> longitud máxima para texto (100 por omisión)
+    choices  -> valores permitidos para "enum"
 """
 import re
 
@@ -36,37 +32,24 @@ def _check_value(field, rules, value):
             return f"El campo '{field}' debe ser true o false"
         return None
 
-    if kind == "enum":
-        if value not in rules["choices"]:
-            return f"El campo '{field}' debe ser uno de: {', '.join(rules['choices'])}"
-        return None
-
-    # int / number (bool es subclase de int en Python, por eso se excluye)
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        return f"El campo '{field}' debe ser numérico"
-    if kind == "int" and not isinstance(value, int):
-        return f"El campo '{field}' debe ser un número entero"
-    if "min" in rules and value < rules["min"]:
-        return f"El campo '{field}' debe ser mayor o igual a {rules['min']}"
-    if "max" in rules and value > rules["max"]:
-        return f"El campo '{field}' debe ser menor o igual a {rules['max']}"
+    # enum
+    if value not in rules["choices"]:
+        return f"El campo '{field}' debe ser uno de: {', '.join(rules['choices'])}"
     return None
 
 
 def _normalize(rules, value):
     if isinstance(value, str):
         value = value.strip()
-        if rules.get("transform") == "lower" or rules["type"] == "email":
+        if rules["type"] == "email":
             value = value.lower()
-        elif rules.get("transform") == "upper":
-            value = value.upper()
     return value
 
 
 def validate(schema, data, partial=False):
     """Regresa (datos_limpios, None) o (None, mensaje_de_error).
 
-    partial=True se usa en PATCH: solo se validan los campos enviados.
+    partial=True se usa en PUT: solo se validan los campos enviados.
     """
     if not isinstance(data, dict):
         return None, "El cuerpo debe ser un objeto JSON"

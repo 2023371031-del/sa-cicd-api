@@ -1,6 +1,6 @@
 # SA — Pipeline CI/CD para API REST (Flask + Docker + GitHub Actions + AWS EC2)
 
-API REST en **Python/Flask** con **75 endpoints**, **181 pruebas** con **pytest** (cobertura del 99 %,
+API REST en **Python/Flask** con **6 endpoints**, **31 pruebas** con **pytest** (cobertura del 99 %,
 umbral mínimo exigido: 70 %) y un pipeline de **GitHub Actions** que en cada `git push` a `main`:
 
 1. corre lint y pruebas, y muestra la cobertura en los logs;
@@ -30,7 +30,7 @@ umbral mínimo exigido: 70 %) y un pipeline de **GitHub Actions** que en cada `g
 ```
 
 Si la imagen nueva no responde en `/api/health`, el pipeline falla **sin tocar** el contenedor que
-está en producción. El paso final comprueba que `GET /api/version` responda con el hash del commit
+está en producción. El paso final comprueba que `GET /api/health` responda con el hash del commit
 recién publicado.
 
 ## Estructura del proyecto
@@ -39,17 +39,14 @@ recién publicado.
 SA/
 ├── .github/workflows/main.yml   # Pipeline CI/CD
 ├── data/
-│   ├── seed.json                # Datos iniciales
+│   ├── seed.json                # Usuarios iniciales
 │   └── store.py                 # "Base de datos" en memoria
-├── routes/                      # Un archivo de rutas por recurso (Blueprints)
-│   ├── crud.py                  # Fábrica de los 6 endpoints CRUD
-│   ├── responses.py             # Formato estándar de respuesta
-│   ├── users.py, products.py, categories.py, suppliers.py, customers.py,
-│   ├── orders.py, departments.py, employees.py, reviews.py, coupons.py
-│   └── system.py                # health, version, endpoints, stats, reset
+├── routes/
+│   ├── users.py                 # Endpoints de usuarios
+│   ├── system.py                # GET /api/health
+│   └── responses.py             # Formato estándar de respuesta
 ├── services/
-│   ├── crud_service.py          # Lógica de negocio (unicidad, llaves foráneas, etc.)
-│   ├── schemas.py               # Esquema de campos de cada recurso
+│   ├── user_service.py          # Lógica de negocio de usuarios
 │   └── validators.py            # Validación de cuerpos JSON
 ├── tests/                       # Pruebas pytest
 ├── scripts/setup_ec2.sh         # Instalación de Docker en la EC2
@@ -62,48 +59,23 @@ SA/
 └── pytest.ini / .coveragerc / .flake8
 ```
 
-## Endpoints (75)
+## Endpoints (6)
 
 Todas las respuestas tienen la forma `{"statusCode": 200, "data": ...}` o, en caso de error,
 `{"statusCode": 4xx, "error": "mensaje"}`.
 
-### CRUD — 6 endpoints × 10 recursos = 60
+| # | Método | Ruta | Descripción | Códigos |
+|---|--------|------|-------------|---------|
+| 1 | GET | `/api/health` | Estado, versión, mensaje y commit desplegado | 200 |
+| 2 | GET | `/api/users` | Listar usuarios | 200 |
+| 3 | GET | `/api/users/{id}` | Consultar un usuario | 200, 404 |
+| 4 | POST | `/api/users` | Crear usuario `{"name", "email", "role"?, "active"?}` | 201, 400, 409, 415 |
+| 5 | PUT | `/api/users/{id}` | Actualizar uno o varios campos | 200, 400, 404, 409, 415 |
+| 6 | DELETE | `/api/users/{id}` | Eliminar usuario | 200, 404 |
 
-Recursos: `users`, `categories`, `suppliers`, `products`, `customers`, `orders`, `departments`,
-`employees`, `reviews`, `coupons`.
-
-| Método | Ruta | Descripción | Códigos |
-|--------|------|-------------|---------|
-| GET | `/api/<recurso>` | Listar. Admite `?campo=valor`, `?q=texto`, `?sort=campo` / `?sort=-campo`, `?limit=`, `?offset=` | 200, 400 |
-| GET | `/api/<recurso>/{id}` | Consultar uno | 200, 404 |
-| POST | `/api/<recurso>` | Crear | 201, 400, 409, 415 |
-| PUT | `/api/<recurso>/{id}` | Reemplazar (todos los campos obligatorios) | 200, 400, 404, 409, 415 |
-| PATCH | `/api/<recurso>/{id}` | Actualizar parcialmente | 200, 400, 404, 409, 415 |
-| DELETE | `/api/<recurso>/{id}` | Eliminar (409 si otro registro lo referencia) | 200, 404, 409 |
-
-### Endpoints adicionales — 15
-
-| # | Método | Ruta | Descripción |
-|---|--------|------|-------------|
-| 61 | GET | `/api/health` | Estado del servicio y tiempo activo |
-| 62 | GET | `/api/version` | Versión, mensaje y commit desplegado |
-| 63 | GET | `/api/endpoints` | Lista todos los endpoints registrados |
-| 64 | GET | `/api/stats` | Número de registros por tabla |
-| 65 | POST | `/api/admin/reset` | Reinicia los datos iniciales |
-| 66 | GET | `/api/categories/{id}/products` | Productos de una categoría |
-| 67 | GET | `/api/suppliers/{id}/products` | Productos de un proveedor |
-| 68 | GET | `/api/products/low-stock?threshold=10` | Productos con poco inventario |
-| 69 | GET | `/api/products/{id}/reviews` | Reseñas de un producto |
-| 70 | GET | `/api/products/{id}/rating` | Calificación promedio de un producto |
-| 71 | GET | `/api/customers/{id}/orders` | Pedidos de un cliente |
-| 72 | POST | `/api/orders/{id}/cancel` | Cancela un pedido (409 si ya se envió o canceló) |
-| 73 | GET | `/api/departments/{id}/employees` | Empleados de un departamento |
-| 74 | POST | `/api/users/{id}/toggle-active` | Activa/desactiva un usuario |
-| 75 | POST | `/api/coupons/validate` | Valida un código de cupón (`{"code": "..."}`) |
-
-Reglas de negocio destacadas: el email y otros campos `unique` no se repiten (409); las llaves
-foráneas (`category_id`, `customer_id`, …) deben existir (400); el `total` de un pedido lo calcula
-el servidor (`precio × cantidad`); los códigos de cupón se guardan en mayúsculas.
+Reglas: `name` y `email` son obligatorios; el email debe tener formato válido, se guarda en
+minúsculas y no puede repetirse (409); `role` solo acepta `admin` o `user`; no se permiten campos
+extra como `id`.
 
 > Los datos viven en memoria (se cargan de `data/seed.json`), por lo que se reinician en cada
 > despliegue. Por eso gunicorn corre con 1 worker y 4 hilos: todas las peticiones comparten los
@@ -177,7 +149,7 @@ Ningún dato sensible (contraseñas, IPs, tokens, llaves) está en el código: t
 
 ## Demostración en vivo
 
-1. Abrir `http://<IP_EC2>/api/version` y mostrar el mensaje y el commit actuales.
+1. Abrir `http://<IP_EC2>/api/health` y mostrar el mensaje y el commit actuales.
 2. Cambiar `MESSAGE` en `config.py`, por ejemplo:
 
    ```python
@@ -188,4 +160,4 @@ Ningún dato sensible (contraseñas, IPs, tokens, llaves) está en el código: t
 4. En la pestaña **Actions** se ven los tres jobs: pruebas y cobertura → build/push a Docker Hub →
    despliegue en la EC2.
 5. En Docker Hub aparece el tag nuevo con el hash del commit.
-6. Recargar `http://<IP_EC2>/api/version`: muestra el mensaje nuevo y el nuevo `commit`.
+6. Recargar `http://<IP_EC2>/api/health`: muestra el mensaje nuevo y el nuevo `commit`.

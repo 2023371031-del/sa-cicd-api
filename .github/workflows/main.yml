@@ -136,7 +136,7 @@ jobs:
 
             # 3. Verificación final: el commit desplegado debe ser el de este push
             for i in $(seq 1 20); do
-              if curl -fs http://localhost/api/version | grep -q "$TAG"; then
+              if curl -fs http://localhost/api/health | grep -q "$TAG"; then
                 echo ">> Despliegue OK, commit $TAG en línea"
                 docker image prune -f
                 exit 0

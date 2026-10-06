@@ -9,7 +9,7 @@ from flask import Flask
 
 from routes import ALL_BLUEPRINTS
 from routes.responses import fail
-from services.crud_service import ServiceError
+from services.user_service import ServiceError
 
 
 def create_app():

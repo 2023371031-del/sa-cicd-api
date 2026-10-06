@@ -139,9 +139,9 @@ está corriendo y regresar a una versión anterior si algo falla.
 
 En este proyecto integrador se implementó un flujo de trabajo completo y profesional para el ciclo
 de vida de una API REST. Se desarrolló una API en Python con el microframework Flask
-\cite{flaskdocs} que expone 75 endpoints sobre diez recursos de un sistema de ventas (usuarios,
-categorías, proveedores, productos, clientes, pedidos, departamentos, empleados, reseñas y
-cupones). La API cuenta con 181 pruebas automatizadas escritas con pytest, que alcanzan una
+\cite{flaskdocs} que expone 6 endpoints para la gestión de usuarios: las cinco operaciones
+CRUD (listar, consultar, crear, actualizar y eliminar) y un endpoint de salud que informa la
+versión desplegada. La API cuenta con 31 pruebas automatizadas escritas con pytest, que alcanzan una
 cobertura de código del 99\,\%, muy por encima del umbral mínimo exigido del 70\,\%. El pipeline,
 definido con GitHub Actions \cite{githubactions}, ejecuta el análisis estático y las pruebas en cada
 \textit{push} o \textit{pull request} a la rama \texttt{main}; cuando el cambio llega a
@@ -173,7 +173,7 @@ AWS EC2 cada vez que se publica un cambio en la rama \texttt{main} del repositor
 
 \subsection{Objetivos específicos}
 \begin{itemize}
-  \item Desarrollar una API REST con al menos 60 endpoints funcionales.
+  \item Desarrollar una API REST con al menos 6 endpoints funcionales.
   \item Implementar pruebas unitarias y de integración con una cobertura mínima del 70\,\%.
   \item Contenedorizar la aplicación con un \texttt{Dockerfile} optimizado y un \texttt{.dockerignore}.
   \item Automatizar pruebas, construcción y publicación de la imagen con GitHub Actions y Docker Hub.
@@ -256,7 +256,7 @@ HTTP en el puerto 80.
 \end{figure}
 
 El código se organizó por capas, siguiendo la estructura vista en clase: \texttt{routes/} contiene
-las rutas (un archivo por recurso), \texttt{services/} la lógica de negocio y las validaciones,
+las rutas (	exttt{users.py} y 	exttt{system.py}), \texttt{services/} la lógica de negocio y las validaciones,
 \texttt{data/} el almacenamiento, y \texttt{tests/} las pruebas. En la raíz se encuentran el
 \texttt{Dockerfile}, el \texttt{.dockerignore} y el workflow en \texttt{.github/workflows/main.yml}.
 
@@ -266,98 +266,82 @@ las rutas (un archivo por recurso), \texttt{services/} la lógica de negocio y l
 
 \subsection{Desarrollo de la API REST}
 
-Se construyó una API con diez recursos. Para no repetir código, cada recurso define únicamente su
-\textit{esquema} de campos (tipo, obligatoriedad, unicidad, llaves foráneas, límites) en
-\texttt{services/schemas.py}; una fábrica de rutas genera automáticamente sus seis operaciones
-CRUD (listar, consultar, crear, reemplazar, actualizar parcialmente y eliminar), lo que da
-$10 \times 6 = 60$ endpoints. A estos se suman 15 endpoints especiales, para un total de
-\textbf{75 endpoints}. La Figura~\ref{fig:estructura} muestra la organización del proyecto y la
-Tabla~\ref{tab:endpoints} resume los endpoints.
+Se construyó una API de gestión de usuarios con \textbf{6 endpoints}: cinco operaciones CRUD sobre
+el recurso \texttt{users} y un endpoint de salud (\texttt{/api/health}) que además informa la
+versión, un mensaje configurable y el hash del commit desplegado. El código se separó en capas:
+las rutas (\texttt{routes/users.py}) solo reciben la petición y devuelven la respuesta; la lógica
+de negocio (\texttt{services/user\_service.py}) valida los datos contra un esquema de campos,
+revisa que el email no se repita y modifica los datos; y \texttt{data/store.py} mantiene los
+usuarios en memoria a partir de \texttt{data/seed.json}. La Figura~\ref{fig:estructura} muestra la
+organización del proyecto y la Tabla~\ref{tab:endpoints} resume los endpoints.
 
 \captura{estructura.png}{Estructura del proyecto en Visual Studio Code}{fig:estructura}
 
 \begin{table}[H]
 \centering
-\caption{Resumen de los 75 endpoints de la API}
+\caption{Endpoints de la API}
 \label{tab:endpoints}
 \footnotesize
-\begin{tabularx}{\textwidth}{@{}llX@{}}
+\begin{tabularx}{\textwidth}{@{}clXl@{}}
 \toprule
-\textbf{Método} & \textbf{Ruta} & \textbf{Descripción} \\
+\textbf{\#} & \textbf{Método} & \textbf{Ruta y descripción} & \textbf{Códigos} \\
 \midrule
-\multicolumn{3}{@{}l}{\textit{CRUD de los 10 recursos (60 endpoints)}} \\
-GET    & \texttt{/api/<recurso>}      & Listar con filtros, búsqueda, orden y paginación \\
-GET    & \texttt{/api/<recurso>/\{id\}} & Consultar un registro \\
-POST   & \texttt{/api/<recurso>}      & Crear un registro \\
-PUT    & \texttt{/api/<recurso>/\{id\}} & Reemplazar un registro completo \\
-PATCH  & \texttt{/api/<recurso>/\{id\}} & Actualizar campos específicos \\
-DELETE & \texttt{/api/<recurso>/\{id\}} & Eliminar (409 si otro registro lo usa) \\
-\midrule
-\multicolumn{3}{@{}l}{\textit{Endpoints especiales (15)}} \\
-GET  & \texttt{/api/health}                    & Estado del servicio \\
-GET  & \texttt{/api/version}                   & Versión, mensaje y commit desplegado \\
-GET  & \texttt{/api/endpoints}                 & Lista de endpoints registrados \\
-GET  & \texttt{/api/stats}                     & Registros por tabla \\
-POST & \texttt{/api/admin/reset}               & Reinicia los datos iniciales \\
-GET  & \texttt{/api/categories/\{id\}/products} & Productos de una categoría \\
-GET  & \texttt{/api/suppliers/\{id\}/products}  & Productos de un proveedor \\
-GET  & \texttt{/api/products/low-stock}        & Productos con poco inventario \\
-GET  & \texttt{/api/products/\{id\}/reviews}    & Reseñas de un producto \\
-GET  & \texttt{/api/products/\{id\}/rating}     & Calificación promedio \\
-GET  & \texttt{/api/customers/\{id\}/orders}    & Pedidos de un cliente \\
-POST & \texttt{/api/orders/\{id\}/cancel}       & Cancelar un pedido \\
-GET  & \texttt{/api/departments/\{id\}/employees} & Empleados de un departamento \\
-POST & \texttt{/api/users/\{id\}/toggle-active} & Activar o desactivar un usuario \\
-POST & \texttt{/api/coupons/validate}          & Validar un cupón \\
+1 & GET    & \texttt{/api/health} --- estado, versión, mensaje y commit & 200 \\
+2 & GET    & \texttt{/api/users} --- listar usuarios & 200 \\
+3 & GET    & \texttt{/api/users/\{id\}} --- consultar un usuario & 200, 404 \\
+4 & POST   & \texttt{/api/users} --- crear un usuario & 201, 400, 409, 415 \\
+5 & PUT    & \texttt{/api/users/\{id\}} --- actualizar uno o varios campos & 200, 400, 404, 409, 415 \\
+6 & DELETE & \texttt{/api/users/\{id\}} --- eliminar un usuario & 200, 404 \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
 Todas las respuestas comparten el formato \texttt{\{"statusCode": ..., "data": ...\}} y los errores
 \texttt{\{"statusCode": ..., "error": "mensaje"\}}, con códigos HTTP coherentes: 201 al crear, 400
-ante datos inválidos, 404 si el recurso no existe, 409 ante duplicados o registros referenciados y
-415 cuando el cuerpo no es JSON. La Figura~\ref{fig:endpoints} muestra el endpoint
-\texttt{/api/endpoints}, que lista los 75 endpoints registrados en la aplicación.
+ante datos inválidos (campos faltantes, vacíos, de tipo incorrecto, email mal formado o campos no
+permitidos como \texttt{id}), 404 si el usuario no existe, 409 si el email ya está registrado y 415
+cuando el cuerpo no es JSON. La Figura~\ref{fig:endpoints} muestra una prueba de los endpoints.
 
-\captura{endpoints.png}{Respuesta de \texttt{GET /api/endpoints} con el total de 75 endpoints}{fig:endpoints}
+\captura{endpoints.png}{Prueba de los endpoints de usuarios en Postman}{fig:endpoints}
 
 \subsection{Pruebas automatizadas y cobertura}
 
 Las pruebas se escribieron con pytest usando el cliente de pruebas de Flask, que permite hacer
 peticiones HTTP a la aplicación sin levantar un servidor. Un \textit{fixture} recarga los datos
-iniciales antes de cada prueba para que sean independientes entre sí. Se implementaron 181 pruebas
-en tres archivos: \texttt{test\_crud\_resources.py} prueba con \textit{parametrización} los seis
-endpoints CRUD de los diez recursos (casos exitosos, datos inválidos, campos no permitidos, cuerpo
-sin JSON, ids inexistentes); \texttt{test\_business\_rules.py} verifica reglas de negocio como la
-unicidad del email, las llaves foráneas, el cálculo del total de los pedidos y los endpoints
-anidados; y \texttt{test\_system.py} cubre los endpoints de sistema y el manejo de errores 404, 405
-y 500. La Figura~\ref{fig:pytest} muestra la ejecución.
+iniciales antes de cada prueba para que sean independientes entre sí. Se implementaron 31 pruebas
+en dos archivos: \texttt{test\_users.py} prueba los cinco endpoints de usuarios, tanto los casos
+exitosos como los errores que puede provocar quien consume la API (email repetido o inválido,
+campos vacíos, tipos incorrectos, campos no permitidos, cuerpo sin JSON, ids inexistentes y
+método no permitido); para los casos de validación se usó \textit{parametrización}, de modo que una
+sola función de prueba se ejecuta con nueve cuerpos inválidos distintos. Por su parte,
+\texttt{test\_system.py} cubre el endpoint de salud y el manejo de errores 404 y 500. La
+Figura~\ref{fig:pytest} muestra la ejecución.
 
 \begin{figure}[H]
 \centering
 \begin{minipage}{0.95\textwidth}
 \begin{lstlisting}[style=term]
 $ pytest -v
-tests/test_business_rules.py::test_duplicate_email_conflict PASSED       [  0%]
-tests/test_business_rules.py::test_patch_keeps_own_unique_value PASSED   [  1%]
-tests/test_business_rules.py::test_patch_duplicate_unique_value PASSED   [  1%]
-tests/test_business_rules.py::test_foreign_key_must_exist PASSED         [  2%]
-tests/test_business_rules.py::test_cannot_delete_referenced_record PASSED [  2%]
-tests/test_business_rules.py::test_email_is_normalized PASSED            [  3%]
+tests/test_system.py::test_health PASSED                                 [  3%]
+tests/test_system.py::test_route_not_found PASSED                        [  6%]
+tests/test_system.py::test_internal_error_handler PASSED                 [  9%]
+tests/test_users.py::test_list_users PASSED                              [ 12%]
+tests/test_users.py::test_get_user PASSED                                [ 16%]
+tests/test_users.py::test_get_user_not_found PASSED                      [ 19%]
 ...
-tests/test_system.py::test_method_not_allowed PASSED                     [ 99%]
-tests/test_system.py::test_internal_error_handler PASSED                 [100%]
-======================== 181 passed in 7.68s ========================
+tests/test_users.py::test_delete_user_not_found PASSED                   [ 96%]
+tests/test_users.py::test_delete_all_not_allowed PASSED                  [100%]
+============================= 31 passed in 0.57s ==============================
 \end{lstlisting}
 \end{minipage}
-\caption{Ejecución local de las 181 pruebas con pytest}
+\caption{Ejecución local de las 31 pruebas con pytest}
 \label{fig:pytest}
 \end{figure}
 
 La cobertura se mide con pytest-cov. En \texttt{pytest.ini} se configuró la opción
 \texttt{-{}-cov-fail-under=70}, de modo que si la cobertura baja del 70\,\% el comando termina con
 error y el pipeline se detiene. Como se observa en la Figura~\ref{fig:cobertura}, se obtuvo una
-cobertura total del \textbf{99.76\,\%}: de 419 sentencias solo una no se ejecuta.
+cobertura total del \textbf{99.48\,\%}: de 191 sentencias solo una no se ejecuta.
 
 \begin{figure}[H]
 \centering
@@ -367,19 +351,19 @@ Name                       Stmts   Miss  Cover   Missing
 --------------------------------------------------------
 app.py                        24      0   100%
 config.py                      2      0   100%
+data/__init__.py               0      0   100%
 data/store.py                 25      0   100%
-routes/crud.py                35      0   100%
-routes/products.py            22      0   100%
-routes/system.py              32      0   100%
-...                          (resto de routes/ al 100%)
-services/__init__.py          16      0   100%
-services/crud_service.py      95      1    99%   57
-services/schemas.py           11      0   100%
-services/validators.py        62      0   100%
+routes/__init__.py             3      0   100%
+routes/responses.py           13      0   100%
+routes/system.py               8      0   100%
+routes/users.py               20      0   100%
+services/__init__.py           0      0   100%
+services/user_service.py      46      0   100%
+services/validators.py        50      1    98%   33
 --------------------------------------------------------
-TOTAL                        419      1    99%
-Required test coverage of 70% reached. Total coverage: 99.76%
-181 passed in 7.68s
+TOTAL                        191      1    99%
+Required test coverage of 70% reached. Total coverage: 99.48%
+31 passed in 0.57s
 \end{lstlisting}
 \end{minipage}
 \caption{Reporte de cobertura de código (umbral mínimo: 70\,\%)}
@@ -393,7 +377,7 @@ El \texttt{Dockerfile} (Figura~\ref{fig:dockerfile}) usa una construcción en do
 segunda copia únicamente ese entorno y el código a una imagen \texttt{python:3.12-slim} limpia,
 sin compiladores ni cachés de pip. Además, el contenedor se ejecuta con un usuario sin privilegios
 (\texttt{appuser}), define un \texttt{HEALTHCHECK} contra \texttt{/api/health} y recibe el hash del
-commit como argumento de construcción para exponerlo en \texttt{/api/version}. Las dependencias se
+commit como argumento de construcción para exponerlo en \texttt{/api/health}. Las dependencias se
 copian antes que el código para aprovechar la caché de capas: si solo cambia el código, no se
 reinstalan las librerías \cite{dockerdocs}.
 
@@ -439,12 +423,12 @@ la construcción y prueba local del contenedor.
 $ docker build -t sa-cicd-api --build-arg GIT_SHA=test123 .
  => naming to docker.io/library/sa-cicd-api:latest                    done
 $ docker run -d --name sa-test -p 8089:8000 sa-cicd-api
-$ curl http://localhost:8089/api/version
-{"statusCode":200,"data":{"version":"1.0.0",
+$ curl http://localhost:8089/api/health
+{"statusCode":200,"data":{"status":"ok","version":"1.0.0",
  "message":"Hola desde el pipeline CI/CD - IDGS16","commit":"test123"}}
 $ docker images sa-cicd-api
 IMAGE                ID             DISK USAGE   CONTENT SIZE
-sa-cicd-api:latest   3298c72c334e        205MB         49.4MB
+sa-cicd-api:latest   639a0ff38f75        205MB         49.4MB
 \end{lstlisting}
 \end{minipage}
 \caption{Construcción y ejecución local de la imagen Docker}
@@ -517,7 +501,7 @@ ejecuta el siguiente proceso:
   \item Si está sana, elimina el contenedor temporal, detiene el contenedor antiguo
         (\texttt{api}) y levanta la nueva versión mapeada al puerto 80 con
         \texttt{--restart unless-stopped}.
-  \item Verifica que \texttt{/api/version} responda con el hash del commit del \textit{push}, lo
+  \item Verifica que \texttt{/api/health} responda con el hash del commit del \textit{push}, lo
         que comprueba que realmente se está sirviendo la versión nueva, y limpia imágenes viejas.
 \end{enumerate}
 
@@ -537,28 +521,28 @@ pública.
 
 Para la demostración en vivo se modificó una sola línea del archivo \texttt{config.py}, la
 constante \texttt{MESSAGE}, y se hizo \texttt{git commit} y \texttt{git push} a \texttt{main}. Antes
-del cambio, \texttt{GET /api/version} mostraba el mensaje original y el hash del commit anterior
+del cambio, \texttt{GET /api/health} mostraba el mensaje original y el hash del commit anterior
 (Figura~\ref{fig:antes}). El pipeline ejecutó las pruebas, publicó la nueva etiqueta en Docker Hub y
 actualizó el servidor; al recargar la URL se obtuvo el mensaje nuevo junto con el hash del nuevo
 commit (Figura~\ref{fig:despues}), sin haber entrado manualmente al servidor.
 
-\captura{demo_antes.png}{\texttt{/api/version} antes del \texttt{git push}}{fig:antes}
+\captura{demo_antes.png}{\texttt{/api/health} antes del \texttt{git push}}{fig:antes}
 
-\captura{demo_despues.png}{\texttt{/api/version} después del \texttt{git push}: mensaje y commit nuevos}{fig:despues}
+\captura{demo_despues.png}{\texttt{/api/health} después del \texttt{git push}: mensaje y commit nuevos}{fig:despues}
 
 % =====================================================================
 \section{Conclusiones}
 % =====================================================================
 
 El proyecto permitió construir de principio a fin un flujo de trabajo CI/CD como el que se usa en
-la industria. Se desarrolló una API REST con 75 endpoints, organizada en capas de rutas, servicios
-y datos, y respaldada por 181 pruebas automatizadas con una cobertura del 99.76\,\%. Más allá del
+la industria. Se desarrolló una API REST con 6 endpoints, organizada en capas de rutas, servicios
+y datos, y respaldada por 31 pruebas automatizadas con una cobertura del 99.48\,\%. Más allá del
 número, las pruebas resultaron ser la pieza que da confianza a todo el pipeline: como el umbral de
 cobertura y el resultado de las pruebas son condiciones obligatorias para continuar, ningún cambio
-que rompa la API puede llegar a Docker Hub ni al servidor. Diseñar la API a partir de esquemas y
-una fábrica de rutas también demostró el valor de no repetir código: agregar un recurso nuevo con
-sus seis endpoints requiere solo unas cuantas líneas, y queda probado automáticamente por las
-pruebas parametrizadas.
+que rompa la API puede llegar a Docker Hub ni al servidor. Separar el código en rutas, servicios
+y datos también demostró su valor: las reglas de negocio (validaciones, email único) viven en un
+solo lugar, lo que facilita probarlas a fondo y agregar nuevos recursos en el futuro sin tocar la
+lógica existente.
 
 La contenedorización con Docker resolvió el problema de las diferencias entre entornos: la misma
 imagen que se probó localmente es la que se publica y se ejecuta en EC2, identificada con el hash
