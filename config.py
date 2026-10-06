@@ -4,4 +4,4 @@ Para la demostración en vivo basta con cambiar MESSAGE, hacer commit y git push
 el pipeline corre las pruebas, publica la imagen y actualiza la EC2.
 """
 VERSION = "1.0.0"
-MESSAGE = "Hola desde el pipeline CI/CD - IDGS16"
+MESSAGE = "Demo en vivo: versión 2 desplegada automáticamente - IDGS16"
