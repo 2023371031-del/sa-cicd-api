@@ -481,7 +481,9 @@ usuario \texttt{ubuntu} dentro del grupo \texttt{docker}. Para preparar una inst
 repositorio incluye el script \texttt{scripts/setup\_ec2.sh}, que instala Docker y configura ese
 grupo. Al \textit{Security Group} se le agregó la regla de entrada HTTP en el puerto 80, por donde se
 atiende a los usuarios, y se abrió el puerto 22 (SSH) a cualquier origen, ya que GitHub Actions se
-conecta desde direcciones IP que cambian en cada ejecución (Figura~\ref{fig:sg}).
+conecta desde direcciones IP que cambian en cada ejecución (Figura~\ref{fig:sg}). Las reglas de los
+puertos 8080 y 6061 que también aparecen en el grupo pertenecen a la práctica anterior y no las usa
+este proyecto.
 
 \captura{ec2_instancia.png}{Instancia EC2 en ejecución en la consola de AWS}{fig:ec2}
 
